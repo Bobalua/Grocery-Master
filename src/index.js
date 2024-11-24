@@ -11,36 +11,44 @@
     - quit
 */
 
-import {argv} from "process";
+import { argv } from "process";
+import { stdin, stdout } from "process";
 import * as fs from "node:fs/promises";
 import * as readline from 'node:readline/promises';
-import {stdin, stdout} from "process";
 
+// Process the arguments
 let fileArgument = argv[2];
 if (fileArgument == undefined){
+    // Set a default value
     fileArgument = "--file=grocery-master.txt"
 }
 
-const groceryFilePath = fileArgument.replace("--file=", "")
+// Sanitize the file argument by removing the '--file=' prefix
+const groceryFilePath = fileArgument.replace("--file=", "");
 
 try {
+    // if this file doesn't exist it will error and teleport to catch
     await fs.access(groceryFilePath, fs.constants.W_OK);
 } catch(err) {
     // if we are in here the file doesn't exist
     await fs.writeFile(groceryFilePath, "");
+    // Then we have created it
 }
 
-// by now grocery file path exists, hopefully
-const groceryFile = fs.open(groceryFilePath, "w");
+// Create the interface that allows the User to feed the program 
+// commands
 const rl = readline.createInterface({
     input: stdin,
     output: stdout
 })
 
-// todo - load list from file
-const list = [];
+const data = (await fs.readFile(groceryFilePath)).toString();
 
-// interactively run commands
+const list = data.split("\n");
+
+// interactively run commands inside an "infinite loop"
+// Except it's not infinite because if the user enters exit
+// We end the loop (by exiting the entire program ☠️)
 while (true) {
     
     // 1. get command
@@ -57,17 +65,57 @@ while (true) {
         console.log(`user tried to add ${inputs[1]}`);
         const item = inputs[1];
         list.push(item)
+    // in relation to sample code given, item = needle, list = fish, and rmItem = haystack
+    // unsure of use of splice method. As written, the intent is to remove 1 value from array 'list' starting at position 'i'
+    // can't run app in bash due to user ignorance
+    // docker dashboard needs to be open to use docker, because of course you big dummy
     } else if (command == "remove") {
-        console.log("remove")
+        // console.log(`user removed ${inputs[1]}`);
+        const userAskedToRemove = inputs[1];
+        let itemRemoved = false;
+        for (let i=0; i < list.length; i++) {          
+            const currentItem = list[i];
+            if (userAskedToRemove == currentItem) {
+                list.splice(i, 1);
+                itemRemoved = true;
+                console.log(`user removed ${inputs[1]}`);
+            }   
+        }
+        if (itemRemoved == false)   {
+            console.log('Item does not exist');
+        }
+        console.log(list);
     } else if (command == "save") {
-        console.log("save")
+        let data = "";
+        for (let i=0; i < list.length; i++) {
+            const currentItem = list[i];
+            if (data == "") {
+                data = currentItem;
+            } else {
+                data = data + "\n" + currentItem;    
+            }
+            
+        }
+        // Write our list to a file
+        await fs.writeFile(groceryFilePath, data);
     } else if (command == "list") {
         console.log(list)
     } else if (command == "help") {
-        console.log("help")
+        console.log('Presenting the greatest grocery list manager this side of the Mississippi');
+        console.log('   Brought to you by bagboy Bobalua');
+        console.log('');
+        console.log('Available Commands:');
+        console.log('   -add - Add item to grocery list');
+        console.log('   -remove - Remove item from grocery list');
+        console.log('   -save - Save grocery list');
+        console.log('   -help - List of available commands');
+        console.log('   -exit - Exits program');
     } else if (command == "quit") {
         process.exit(0);
+    } else if (command == "") {
+        console.log('please use known command')
     } else {
+        console.log('unknown command')
         // user tried to run and unknown command
     }
 };
